@@ -1,7 +1,7 @@
 use glob::glob_with;
 use glob::MatchOptions;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 struct Post {
     relative_path: String,
     tags: Option<Vec<String>>,
@@ -10,6 +10,11 @@ struct Post {
     draft: Option<bool>,
     content: String,
     date: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct CreatePostRequest {
+    title: String,
 }
 
 fn get_posts(dir: &str) -> std::vec::Vec<Post> {
@@ -168,28 +173,53 @@ pub async fn list_projects() -> Result<impl warp::Reply, Infallible> {
     Ok(warp::reply::json(&posts))
 }
 
-// fn json_body() -> impl Filter<Extract = (Post,), Error = warp::Rejection> + Clone {
-//     // When accepting a body, we want a JSON body
-//     // (and to reject huge payloads)...
-//     warp::body::content_length_limit(1024 * 16).and(warp::body::json())
-// }
+fn json_body() -> impl Filter<Extract = (Post,), Error = warp::Rejection> + Clone {
+    // When accepting a body, we want a JSON body
+    // (and to reject huge payloads)...
+    warp::body::content_length_limit(1024 * 16).and(warp::body::json())
+}
 
-// pub fn posts_create(
-// ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-//     warp::path!("posts")
-//         .and(warp::post())
-//         .and(json_body())
-//         .and_then(handlers::create_todo)
-// }
+fn json_body_for_post_creation(
+) -> impl Filter<Extract = (CreatePostRequest,), Error = warp::Rejection> + Clone {
+    // When accepting a body, we want a JSON body
+    // (and to reject huge payloads)...
+    warp::body::content_length_limit(1024 * 16).and(warp::body::json())
+}
 
-// /// PUT /todos/:id with JSON body
-// pub fn posts_update(
-// ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-//     warp::path!("todos" / u64)
-//         .and(warp::put())
-//         .and(json_body())
-//         .and_then(handlers::update_todo)
-// }
+async fn create_post(
+    create_post_req: CreatePostRequest,
+) -> Result<impl warp::Reply, warp::Rejection> {
+    println!("about to create post with info like: {:?}", create_post_req);
+
+    let dir = "/Users/dongbinli/sites/orchardlabdev-site";
+    let result = create_new_post(dir, create_post_req.title);
+    Ok(warp::reply::json(&result))
+}
+
+pub fn posts_create() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+    warp::path!("posts")
+        .and(warp::post())
+        .and(json_body_for_post_creation())
+        .and_then(create_post)
+}
+
+async fn update_post(post: Post) -> Result<impl warp::Reply, warp::Rejection> {
+    println!("about to update post like: {:?} ", post);
+    let dir = "/Users/dongbinli/sites/orchardlabdev-site";
+
+    match update_post_content(dir, post.content, post.relative_path) {
+        Ok(updated_post) => Ok(warp::reply::json(&updated_post)),
+        Err(_) => Ok(warp::reply::json(&String::from("somwthing wrong"))),
+    }
+}
+
+/// PUT /todos/:id with JSON body
+pub fn posts_update() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+    warp::path!("posts")
+        .and(warp::put())
+        .and(json_body())
+        .and_then(update_post)
+}
 
 //}
 
@@ -199,7 +229,9 @@ async fn main() {
     // GET /hello/warp => 200 OK with body "Hello, warp!"
     let routes = warp::path!("posts")
         .and(warp::get())
-        .and_then(list_projects);
+        .and_then(list_projects)
+        .or(posts_create())
+        .or(posts_update());
 
     // routes = routes.or
 
