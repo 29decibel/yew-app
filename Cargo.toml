@@ -8,5 +8,7 @@ edition = "2021"
 [dependencies]
 yew = "0.19"
 
+glob = "0.3.0"
+
 
 
