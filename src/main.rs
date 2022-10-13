@@ -142,6 +142,11 @@ fn update_post_content(
     // modify the original content
     md.set_content(new_content);
 
+    // set front matter
+    // serialize the PostConfig and set here
+    // we will have a separate function dealing with this
+    // md.set_front_matter(String::from(""));
+
     match md.write_file(path) {
         Ok(_) => {
             let path_buf = path.to_path_buf();
