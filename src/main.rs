@@ -45,11 +45,12 @@ use glob::MatchOptions;
 #[derive(Debug)]
 struct Post {
     relative_path: String,
-    tags: Vec<String>,
+    tags: Option<Vec<String>>,
     title: String,
-    description: String,
-    draft: bool,
+    description: Option<String>,
+    draft: Option<bool>,
     content: String,
+    date: Option<DateTime<Utc>>,
 }
 
 fn get_posts(dir: &str) -> std::vec::Vec<Post> {
@@ -66,19 +67,46 @@ fn get_posts(dir: &str) -> std::vec::Vec<Post> {
         .collect::<Vec<_>>()
 }
 
+use chrono::{DateTime, Utc};
+use markdown_parser;
+
+use serde::{Deserialize, Serialize};
+
+#[derive(Deserialize, Debug)]
+struct PostConfig {
+    title: String,
+    description: Option<String>,
+    tags: Option<Vec<String>>,
+    draft: Option<bool>,
+    date: Option<DateTime<Utc>>,
+}
+
 fn get_post_from_path(path: &std::path::PathBuf) -> Option<Post> {
     // reading the path and parse
-    let file_result = std::fs::read_to_string(path);
+    //let file_result = std::fs::read_to_string(path);
+    // using markdown parser to read
+    let markdown_result = markdown_parser::read_file(path);
     // parsing different tags
-    match (file_result) {
-        Ok(content) => Some(Post {
-            relative_path: String::from(path.to_str().unwrap()),
-            tags: vec![String::from("tag1"), String::from("tag2")],
-            title: String::from("some title"),
-            description: String::from("some description"),
-            draft: false,
-            content: content,
-        }),
+    match markdown_result {
+        Ok(content) => {
+            match content.adapt::<markdown_parser::TomlAdapter, markdown_parser::BasicObject>() {
+                Ok(md) => {
+                    let content = md.content().clone();
+                    let front_matter = md.front_matter();
+                    let post_config: PostConfig = toml::from_str(front_matter).unwrap();
+                    Some(Post {
+                        relative_path: String::from(path.to_str().unwrap()),
+                        tags: post_config.tags,
+                        title: post_config.title,
+                        description: post_config.description,
+                        draft: post_config.draft,
+                        content: content,
+                        date: post_config.date,
+                    })
+                }
+                Err(_) => None,
+            }
+        }
         Err(_) => None,
     }
 }

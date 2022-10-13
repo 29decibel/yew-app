@@ -10,5 +10,8 @@ yew = "0.19"
 
 glob = "0.3.0"
 
-
-
+# parse markdown
+markdown-parser = { version = "0.1.2", features = ["adapt"] }
+toml = "0.5.9"
+serde = { version = "1.0", features = ["derive"] }
+chrono = {version = "0.4.22", features = ["serde"]}
