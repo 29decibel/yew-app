@@ -81,6 +81,12 @@ struct PostConfig {
     date: Option<DateTime<Utc>>,
 }
 
+fn get_post_from_relative_path(dir: &str, relative_path: String) -> Option<Post> {
+    let full_path = format!("{}/{}", dir, relative_path);
+    let path_buf = std::path::PathBuf::from(full_path);
+    get_post_from_path(&path_buf)
+}
+
 fn get_post_from_path(path: &std::path::PathBuf) -> Option<Post> {
     // reading the path and parse
     //let file_result = std::fs::read_to_string(path);
@@ -159,6 +165,32 @@ fn update_post_content(
     }
 }
 
+fn to_slug(str: String) -> String {
+    slug::slugify(str)
+}
+
+use std::process::Command;
+
+// create post
+fn create_new_post(dir: &str, title: String) -> Option<Post> {
+    // turn given title into slug
+    let slug = to_slug(title);
+    let relative_path = format!("content/posts/{}.md", slug);
+    let result = Command::new("/opt/homebrew/bin/hugo")
+        .current_dir(dir)
+        .arg("new")
+        .arg(relative_path.clone()) // passing clone in so it won't hold the ref / or borrowed
+        .output();
+    // trigger hugo command to create that
+    match result {
+        Ok(_) => {
+            // read post back
+            get_post_from_relative_path(dir, relative_path)
+        }
+        Err(_) => None,
+    }
+}
+
 fn main() {
     let dir = "/Users/dongbinli/sites/orchardlabdev-site";
     let posts = get_posts(dir);
@@ -172,5 +204,9 @@ fn main() {
         String::from("content/posts/just-test-rust-client.md"),
     );
     println!("=======> {:?}", rr);
+
+    // test creating new post
+    let post = create_new_post(dir, String::from("This is a brave new world!!"));
+    println!("++++++++++ NEW Post: {:?}", post);
     //yew::start_app::<Model>();
 }
