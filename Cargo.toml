@@ -16,3 +16,7 @@ toml = "0.5.9"
 serde = { version = "1.0", features = ["derive"] }
 chrono = {version = "0.4.22", features = ["serde"]}
 slug = "0.1.4"
+
+# web server
+tokio = { version = "1", features = ["full"] }
+warp = "0.3"

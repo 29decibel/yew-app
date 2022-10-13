@@ -1,44 +1,3 @@
-use yew::prelude::*;
-
-enum Msg {
-    AddOne,
-}
-
-struct Model {
-    value: i64,
-}
-
-impl Component for Model {
-    type Message = Msg;
-    type Properties = ();
-
-    fn create(_ctx: &Context<Self>) -> Self {
-        Self { value: 0 }
-    }
-
-    fn update(&mut self, _ctx: &Context<Self>, msg: Self::Message) -> bool {
-        match msg {
-            Msg::AddOne => {
-                self.value += 1;
-                // the value has changed so we need to
-                // re-render for it to appear on the page
-                true
-            }
-        }
-    }
-
-    fn view(&self, ctx: &Context<Self>) -> Html {
-        // This gives us a component's "`Scope`" which allows us to send messages, etc to the component.
-        let link = ctx.link();
-        html! {
-            <div>
-                <button onclick={link.callback(|_| Msg::AddOne)}>{ "+1" }</button>
-                <p>{ self.value }</p>
-            </div>
-        }
-    }
-}
-
 use glob::glob_with;
 use glob::MatchOptions;
 
@@ -63,7 +22,7 @@ fn get_posts(dir: &str) -> std::vec::Vec<Post> {
     glob_with(format!("{}/{}", dir, markdown_glob).as_str(), options)
         .unwrap()
         .filter_map(|p| p.ok())
-        .filter_map(|pb| get_post_from_path(&pb))
+        .filter_map(|pb| get_post_from_path(dir, &pb))
         .collect::<Vec<_>>()
 }
 
@@ -84,14 +43,17 @@ struct PostConfig {
 fn get_post_from_relative_path(dir: &str, relative_path: String) -> Option<Post> {
     let full_path = format!("{}/{}", dir, relative_path);
     let path_buf = std::path::PathBuf::from(full_path);
-    get_post_from_path(&path_buf)
+    get_post_from_path(dir, &path_buf)
 }
 
-fn get_post_from_path(path: &std::path::PathBuf) -> Option<Post> {
+fn get_post_from_path(dir: &str, path: &std::path::PathBuf) -> Option<Post> {
     // reading the path and parse
     //let file_result = std::fs::read_to_string(path);
     // using markdown parser to read
     let markdown_result = markdown_parser::read_file(path);
+
+    // relative path
+    let relative_path = path.strip_prefix(dir).unwrap();
     // parsing different tags
     match markdown_result {
         Ok(content) => {
@@ -101,7 +63,7 @@ fn get_post_from_path(path: &std::path::PathBuf) -> Option<Post> {
                     let front_matter = md.front_matter();
                     let post_config: PostConfig = toml::from_str(front_matter).unwrap();
                     Some(Post {
-                        relative_path: String::from(path.to_str().unwrap()),
+                        relative_path: String::from(relative_path.to_str().unwrap()),
                         tags: post_config.tags,
                         title: post_config.title,
                         description: post_config.description,
@@ -156,7 +118,7 @@ fn update_post_content(
     match md.write_file(path) {
         Ok(_) => {
             let path_buf = path.to_path_buf();
-            match get_post_from_path(&path_buf) {
+            match get_post_from_path(dir, &path_buf) {
                 Some(post) => Ok(post),
                 None => Err(Box::new(GeneralError {})),
             }
@@ -191,7 +153,60 @@ fn create_new_post(dir: &str, title: String) -> Option<Post> {
     }
 }
 
-fn main() {
+use warp::Filter;
+
+//mod handlers {
+
+use std::convert::Infallible;
+use warp::http::StatusCode;
+
+pub async fn list_projects() -> Result<impl warp::Reply, Infallible> {
+    // Just return a JSON array of todos, applying the limit and offset.
+    let dir = "/Users/dongbinli/sites/orchardlabdev-site";
+    let posts = get_posts(dir);
+    //let todos: Vec<Post> = posts.clone().into_iter().collect();
+    Ok(warp::reply::json(&posts))
+}
+
+// fn json_body() -> impl Filter<Extract = (Post,), Error = warp::Rejection> + Clone {
+//     // When accepting a body, we want a JSON body
+//     // (and to reject huge payloads)...
+//     warp::body::content_length_limit(1024 * 16).and(warp::body::json())
+// }
+
+// pub fn posts_create(
+// ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+//     warp::path!("posts")
+//         .and(warp::post())
+//         .and(json_body())
+//         .and_then(handlers::create_todo)
+// }
+
+// /// PUT /todos/:id with JSON body
+// pub fn posts_update(
+// ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+//     warp::path!("todos" / u64)
+//         .and(warp::put())
+//         .and(json_body())
+//         .and_then(handlers::update_todo)
+// }
+
+//}
+
+#[tokio::main]
+async fn main() {
+    // https://github.com/seanmonstar/warp/blob/master/examples/todos.rs
+    // GET /hello/warp => 200 OK with body "Hello, warp!"
+    let routes = warp::path!("posts")
+        .and(warp::get())
+        .and_then(list_projects);
+
+    // routes = routes.or
+
+    warp::serve(routes).run(([127, 0, 0, 1], 3030)).await;
+}
+
+fn test_main() {
     let dir = "/Users/dongbinli/sites/orchardlabdev-site";
     let posts = get_posts(dir);
     // parse all the results and convert them into Post array
@@ -209,4 +224,6 @@ fn main() {
     let post = create_new_post(dir, String::from("This is a brave new world!!"));
     println!("++++++++++ NEW Post: {:?}", post);
     //yew::start_app::<Model>();
+
+    // start web server
 }
