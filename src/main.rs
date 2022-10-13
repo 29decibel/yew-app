@@ -52,7 +52,7 @@ struct Post {
     content: String,
 }
 
-fn get_posts(dir: &str) -> std::vec::Vec<std::path::PathBuf> {
+fn get_posts(dir: &str) -> std::vec::Vec<Post> {
     let options = MatchOptions {
         case_sensitive: false,
         require_literal_separator: false,
@@ -62,35 +62,30 @@ fn get_posts(dir: &str) -> std::vec::Vec<std::path::PathBuf> {
     glob_with(format!("{}/{}", dir, markdown_glob).as_str(), options)
         .unwrap()
         .filter_map(|p| p.ok())
+        .filter_map(|pb| get_post_from_path(&pb))
         .collect::<Vec<_>>()
 }
 
-fn get_post_from_path(path: &std::path::Path) -> Post {
+fn get_post_from_path(path: &std::path::PathBuf) -> Option<Post> {
     // reading the path and parse
-    Post {
-        relative_path: String::from(path.to_str().unwrap()),
-        tags: vec![String::from("tag1"), String::from("tag2")],
-        title: String::from("some title"),
-        description: String::from("some description"),
-        draft: false,
-        content: String::from(""),
+    let file_result = std::fs::read_to_string(path);
+    // parsing different tags
+    match (file_result) {
+        Ok(content) => Some(Post {
+            relative_path: String::from(path.to_str().unwrap()),
+            tags: vec![String::from("tag1"), String::from("tag2")],
+            title: String::from("some title"),
+            description: String::from("some description"),
+            draft: false,
+            content: content,
+        }),
+        Err(_) => None,
     }
-}
-
-fn convert_to_posts(dir: &str, post_paths: std::vec::Vec<std::path::PathBuf>) -> Vec<Post> {
-    let nice: Vec<Post> = post_paths
-        .iter()
-        .filter_map(|pb| pb.strip_prefix(dir).ok())
-        .map(|p| get_post_from_path(p))
-        .collect();
-
-    nice
 }
 
 fn main() {
     let dir = "/Users/dongbinli/sites/orchardlabdev-site";
-    let results = get_posts(dir);
-    let posts = convert_to_posts(dir, results);
+    let posts = get_posts(dir);
     // parse all the results and convert them into Post array
     println!("{:?}", posts);
     //yew::start_app::<Model>();
