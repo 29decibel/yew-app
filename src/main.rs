@@ -42,7 +42,7 @@ impl Component for Model {
 use glob::glob_with;
 use glob::MatchOptions;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 struct Post {
     relative_path: String,
     tags: Option<Vec<String>>,
@@ -72,7 +72,7 @@ use markdown_parser;
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Serialize)]
 struct PostConfig {
     title: String,
     description: Option<String>,
@@ -111,10 +111,61 @@ fn get_post_from_path(path: &std::path::PathBuf) -> Option<Post> {
     }
 }
 
+// can not get post from path error
+use std::{error::Error, fmt};
+
+#[derive(Debug)]
+struct GeneralError;
+
+impl Error for GeneralError {}
+
+impl fmt::Display for GeneralError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Oh no, something bad went down")
+    }
+}
+
+// update post content
+// Box<dyn std::error::Error> means any error?
+fn update_post_content(
+    dir: &str,
+    new_content: String,
+    relative_path: String,
+) -> Result<Post, Box<dyn std::error::Error>> {
+    // getting full path
+    let path_string = format!("{}/{}", dir, relative_path);
+    let path = std::path::Path::new(&path_string);
+    // get the content
+    let content = markdown_parser::read_file(path)?;
+    let mut md = content.adapt::<markdown_parser::TomlAdapter, markdown_parser::BasicObject>()?;
+
+    // modify the original content
+    md.set_content(new_content);
+
+    match md.write_file(path) {
+        Ok(_) => {
+            let path_buf = path.to_path_buf();
+            match get_post_from_path(&path_buf) {
+                Some(post) => Ok(post),
+                None => Err(Box::new(GeneralError {})),
+            }
+        }
+        Err(e) => Err(Box::new(e)),
+    }
+}
+
 fn main() {
     let dir = "/Users/dongbinli/sites/orchardlabdev-site";
     let posts = get_posts(dir);
     // parse all the results and convert them into Post array
     println!("{:?}", posts);
+
+    // trying update for now
+    let rr = update_post_content(
+        dir,
+        String::from("here is the updated content now..."),
+        String::from("content/posts/just-test-rust-client.md"),
+    );
+    println!("=======> {:?}", rr);
     //yew::start_app::<Model>();
 }
